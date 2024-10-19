@@ -13,6 +13,6 @@ shared_scripts {
 
 client_script 'client/main.lua'
 
-dependency 'lxr--core'
+dependency 'lxr-core'
 
 lua54 'yes'
