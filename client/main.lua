@@ -1,3 +1,28 @@
+--[[
+    ██╗     ██╗  ██╗██████╗        ██████╗ ██████╗ ██████╗ ███████╗
+    ██║     ╚██╗██╔╝██╔══██╗      ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+    ██║      ╚███╔╝ ██████╔╝█████╗██║     ██║   ██║██████╔╝█████╗  
+    ██║      ██╔██╗ ██╔══██╗╚════╝██║     ██║   ██║██╔══██╗██╔══╝  
+    ███████╗██╔╝ ██╗██║  ██║      ╚██████╗╚██████╔╝██║  ██║███████╗
+    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝       ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+
+    🐺 LXR Door Lock System — Client
+
+    ═══════════════════════════════════════════════════════════════════════════════
+    SERVER INFORMATION
+    ═══════════════════════════════════════════════════════════════════════════════
+
+    Server:      The Land of Wolves 🐺
+    Developer:   iBoss21 / The Lux Empire
+    Website:     https://www.wolves.land
+    Discord:     https://discord.gg/CrKcWdfd3A
+    Store:       https://theluxempire.tebex.io
+
+    ═══════════════════════════════════════════════════════════════════════════════
+
+    © 2026 iBoss21 / The Lux Empire | wolves.land | All Rights Reserved
+]]
+
 local CoolDown = 0
 
 --------------------------------------------------------------------------------
@@ -77,6 +102,22 @@ RegisterNetEvent('lxr-doorlock:changedoor', function(doorID, state)
 		DeleteObject(prop)
 	end
 end)
+
+-- Notification handler (sent from server when access is denied)
+RegisterNetEvent('lxr-doorlock:notify', function(message)
+    -- Display as 3D text near the player for a brief duration
+    CreateThread(function()
+        local ped = PlayerPedId()
+        local coords = GetEntityCoords(ped)
+        local timeout = 120
+        while timeout > 0 do
+            Wait(0)
+            timeout = timeout - 1
+            DrawText3Ds(coords.x, coords.y, coords.z + 0.5, message)
+        end
+    end)
+end)
+
 
 -- Set state for a door
 RegisterNetEvent('lxr-doorlock:setState', function(doorID, state)
