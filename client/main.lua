@@ -1,234 +1,93 @@
---[[
-    ██╗     ██╗  ██╗██████╗        ██████╗ ██████╗ ██████╗ ███████╗
-    ██║     ╚██╗██╔╝██╔══██╗      ██╔════╝██╔═══██╗██╔══██╗██╔════╝
-    ██║      ╚███╔╝ ██████╔╝█████╗██║     ██║   ██║██████╔╝█████╗  
-    ██║      ██╔██╗ ██╔══██╗╚════╝██║     ██║   ██║██╔══██╗██╔══╝  
-    ███████╗██╔╝ ██╗██║  ██║      ╚██████╗╚██████╔╝██║  ██║███████╗
-    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝       ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+--[[ ═══════════════════════════════════════════════════════════════════════════
+     LXR-DOORS — Client: the game's doors follow the server's state
+     ═══════════════════════════════════════════════════════════════════════════
+     Registers every door with the game, mirrors GlobalState['door:<id>']
+     into the door system, and offers the options through lxr-interact.
+     No loops: state bag handlers and interact points do the work.
+     ═══════════════════════════════════════════════════════════════════════════
+     © 2026 iBoss21 / LXRCore — All Rights Reserved
+     ═══════════════════════════════════════════════════════════════════════════ ]]
 
-    🐺 LXR Door Lock System — Client
+local LXRCore = exports['lxr-core']:GetCoreObject()
+local LXR = exports['lxr-core']:GetLXR()
+local D = LXRDoors
+local N = Citizen.InvokeNative
+local registered = {}   -- id → true once the game knows the hashes
 
-    ═══════════════════════════════════════════════════════════════════════════════
-    SERVER INFORMATION
-    ═══════════════════════════════════════════════════════════════════════════════
+local function me() return LXRCore.PlayerData or {} end
+local function ctx()
+    local job = me().job or {}
+    local def = LXRShared.Jobs and LXRShared.Jobs[job.name]
+    return { job = { name = job.name, grade = job.grade, type = def and def.type }, gang = me().gang }
+end
+local function locked(id) return GlobalState['door:' .. id] == true end
+local function toast(key, kind, vars) LXRCore.Notify(Lang:t(key, vars), kind or 'info') end
 
-    Server:      The Land of Wolves 🐺
-    Developer:   iBoss21 / The Lux Empire
-    Website:     https://www.wolves.land
-    Discord:     https://discord.gg/CrKcWdfd3A
-    Store:       https://theluxempire.tebex.io
-
-    ═══════════════════════════════════════════════════════════════════════════════
-
-    © 2026 iBoss21 / The Lux Empire | wolves.land | All Rights Reserved
-]]
-
-local CoolDown = 0
-
---------------------------------------------------------------------------------
----- FUNCTIONS
---------------------------------------------------------------------------------
-
-local function DrawText3Ds(x, y, z, text)
-    local onScreen,_x,_y=GetScreenCoordFromWorldCoord(x, y, z)
-    local px,py,pz=table.unpack(GetGameplayCamCoord())
-    SetTextScale(0.35, 0.35)
-    SetTextFontForCurrentCommand(1)
-    SetTextColor(255, 255, 255, 215)
-    local str = CreateVarString(10, "LITERAL_STRING", text, Citizen.ResultAsLong())
-    SetTextCentre(1)
-    DisplayText(str,_x,_y)
-    local factor = (string.len(text)) / 150
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 🚪 GAME DOORS
+-- ═══════════════════════════════════════════════════════════════════════════════
+local function apply(door)
+    local st = D.GameState(locked(door.id))
+    for _, hash in ipairs(door.hashes) do
+        if not IsDoorRegisteredWithSystem(hash) then N(0xD99229FE93B46286, hash, 1, 1, 0, 0, 0, 0) end
+        DoorSystemSetDoorState(hash, st)
+    end
 end
 
-local function ChangeStateText(coords, state)
-	CreateThread(function()
-		local timeout = 80
-		local Text = ""
-		local r,g,b = 0,0,0
-		if state == false then
-			Text =  Lang:t("info.unlocking")
-			r,g,b = 51, 153, 51
-		elseif state == true then
-			Text = Lang:t("info.locking")
-			r,g,b = 153, 1, 1
-		end
-		while timeout > 0 do
-			Wait(0)
-			timeout = timeout - 1
-			DrawText3Ds(coords.x, coords.y, coords.z, Text, r, g, b)
-		end
-	end)
+local function register(door)
+    if registered[door.id] then return end
+    registered[door.id] = true
+    apply(door)
+    AddStateBagChangeHandler('door:' .. door.id, 'global', function() apply(door) end)
+    local I = exports['lxr-interact']
+    I:AddPoint('lxr-doors:' .. door.id, door.coords, { label = door.label, distance = door.distance or Config.Doors.distance, options = {
+        { label = Lang:t('ui.unlock'), key = 'J', canInteract = function() return locked(door.id) and D.MayWork(door, ctx(), me().items) end,
+          onSelect = function() local ok, res = LXR.RPC.Server('lxr-doors:toggle', door.id, false) if not ok then toast('error.' .. tostring(res), 'error') end end },
+        { label = Lang:t('ui.lock'), key = 'J', canInteract = function() return not locked(door.id) and D.MayWork(door, ctx(), me().items) end,
+          onSelect = function() local ok, res = LXR.RPC.Server('lxr-doors:toggle', door.id, true) if not ok then toast('error.' .. tostring(res), 'error') end end },
+        { label = Lang:t('ui.pick'), key = 'G',
+          canInteract = function() return Config.Pick.enabled and door.pickable and locked(door.id) and D.PickIn(me().items) ~= nil and not D.MayWork(door, ctx(), me().items) and GetResourceState('lxr-lockpick') == 'started' end,
+          onSelect = function()
+              local ok, res = LXR.RPC.Server('lxr-doors:canPick', door.id)
+              if not ok then return toast('error.' .. tostring(res), 'error') end
+              TriggerEvent(Config.Pick.event, { door = door.id, label = door.label, report = 'lxr-doors:server:picked' })
+          end },
+        { label = Lang:t('ui.knock'), key = 'E', canInteract = function() return Config.Doors.knock and locked(door.id) and not D.MayWork(door, ctx(), me().items) end,
+          onSelect = function() TriggerServerEvent('lxr-doors:server:knock', door.id) end },
+        { label = Lang:t('ui.try'), key = 'E', canInteract = function() return locked(door.id) and not Config.Doors.knock and not D.MayWork(door, ctx(), me().items) end,
+          onSelect = function() PlaySoundFrontend(Config.Doors.lockedSound, 'Doors_Sounds', true, 0) toast('info.locked_door', 'info', { label = door.label }) end },
+    }})
 end
 
---------------------------------------------------------------------------------
----- EVENTS & HANDLERS
---------------------------------------------------------------------------------
+local function boot()
+    if GetResourceState('lxr-interact') ~= 'started' then
+        print('^1[lxr-doors]^7 lxr-interact is not running — doors have no interaction')
+    end
+    for _, door in ipairs(Config.List) do register(door) end
+end
 
-RegisterNetEvent('lxr-doorlock:changedoor', function(doorID, state)
-	ChangeStateText(Config.DoorList[doorID].textCoords, state)
-	prop_name = 'P_KEY02X'
-	local ped = PlayerPedId()
-        local p1 = GetEntityCoords(ped, true)
-        local p2 = Config.DoorList[doorID].textCoords
-        local dx = p2.x - p1.x
-        local dy = p2.y - p1.y
-
-        local heading = GetHeadingFromVector_2d(dx, dy)
-        SetPedDesiredHeading( ped, heading )
-
-	local x,y,z = table.unpack(GetEntityCoords(ped, true))
-	local prop = CreateObject(GetHashKey(prop_name), x, y, z + 0.2, true, true, true)
-	local boneIndex = GetEntityBoneIndexByName(ped, "SKEL_R_Finger12")
-
-	if not IsEntityPlayingAnim(ped, "script_common@jail_cell@unlock@key", "action", 3) then
-		local waiting = 0
-		if not HasAnimDictLoaded("script_common@jail_cell@unlock@key") then
-			RequestAnimDict("script_common@jail_cell@unlock@key")
-			while not HasAnimDictLoaded("script_common@jail_cell@unlock@key") do
-				Citizen.Wait(100)
-				RequestAnimDict("script_common@jail_cell@unlock@key")
-			end
-		end
-			Wait(100)
-		TaskPlayAnim(ped, 'script_common@jail_cell@unlock@key', 'action', 8.0, -8.0, 2500, 31, 0, true, 0, false, 0, false)
-		RemoveAnimDict("script_common@jail_cell@unlock@key")
-			Wait(750)
-		AttachEntityToEntity(prop, ped,boneIndex, 0.02, 0.0120, -0.00850, 0.024, -160.0, 200.0, true, true, false, true, 1, true)
-			Wait(250)
-		TriggerServerEvent('lxr-doorlock:updateState', doorID, state, function(cb) end)
-			Wait(1500)
-		ClearPedSecondaryTask(ped)
-		DeleteObject(prop)
-	end
+RegisterNetEvent('lxr-doors:client:added', function(def)
+    for i, d in ipairs(Config.List) do if d.id == def.id then table.remove(Config.List, i) end end
+    Config.List[#Config.List + 1] = def
+    D.Refresh()
+    registered[def.id] = nil
+    exports['lxr-interact']:Remove('lxr-doors:' .. def.id)
+    register(def)
 end)
 
--- Notification handler (sent from server when access is denied)
-RegisterNetEvent('lxr-doorlock:notify', function(message)
-    -- Display as 3D text near the player for a brief duration
-    CreateThread(function()
-        local ped = PlayerPedId()
-        local coords = GetEntityCoords(ped)
-        local timeout = 120
-        while timeout > 0 do
-            Wait(0)
-            timeout = timeout - 1
-            DrawText3Ds(coords.x, coords.y, coords.z + 0.5, message)
-        end
-    end)
+RegisterNetEvent('lxr:client:loaded', boot)
+AddEventHandler('onResourceStart', function(res)
+    if res == GetCurrentResourceName() and LocalPlayer.state.isLoggedIn then boot() end
+end)
+AddEventHandler('onResourceStop', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    for _, door in ipairs(Config.List) do for _, hash in ipairs(door.hashes) do if IsDoorRegisteredWithSystem(hash) then DoorSystemSetDoorState(hash, 0) end end end
 end)
 
-
--- Set state for a door
-RegisterNetEvent('lxr-doorlock:setState', function(doorID, state)
-	Config.DoorList[doorID].locked = state
-end)
-
---------------------------------------------------------------------------------
----- THREADS
---------------------------------------------------------------------------------
-
-CreateThread(function()
-	while true do
-		for _,doorID in pairs(Config.DoorList) do
-			if doorID.doors then
-				for k,v in pairs(doorID.doors) do
-					if not v.object or not DoesEntityExist(v.object) then
-						local shapeTest = StartShapeTestBox(v.objCoords, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, true, 16)
-						local rtnVal, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(shapeTest)
-						v.object = entityHit
-					end
-				end
-			else
-				if not doorID.object or not DoesEntityExist(doorID.object) then
-					local shapeTest = StartShapeTestBox(doorID.objCoords, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, true, 16)
-					local rtnVal, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(shapeTest)
-					doorID.object = entityHit
-				end
-			end
-		end
-		Wait(1000)
-	end
-end)
-
-CreateThread(function()
-	while true do
-		Citizen.Wait(0)
-		local playerCoords, letSleep = GetEntityCoords(PlayerPedId()), true
-
-		for k,doorID in ipairs(Config.DoorList) do
-			local distance = #(playerCoords - doorID.textCoords)
-
-			local maxDistance, displayText = 1.25, Lang:t("info.unlocked")
-
-			if doorID.distance then
-				maxDistance = doorID.distance
-			end
-
-			if distance < 50 then
-				letSleep = false
-
-				if doorID.doors then
-					if doorID.locked then
-						for _,v in ipairs(doorID.doors) do
-							if Citizen.InvokeNative(0x160AA1B32F6139B8, v.doorid) ~= 3 then
-								Citizen.InvokeNative(0xD99229FE93B46286, v.doorid,1,1,0,0,0,0)
-								Citizen.InvokeNative(0x6BAB9442830C7F53, v.doorid, 3)
-							end
-							local current = GetEntityRotation(v.object).z - v.objYaw
-							if v.objYaw and current > 0.5 or current < -0.5 then
-								SetEntityRotation(v.object, 0.0, 0.0, v.objYaw, 2, true)
-							end
-							FreezeEntityPosition(v.object,true)
-						end
-					else
-						for _,v in ipairs(doorID.doors) do
-							if Citizen.InvokeNative(0x160AA1B32F6139B8, v.doorid) ~= false then
-								Citizen.InvokeNative(0xD99229FE93B46286, v.doorid,1,1,0,0,0,0)
-								Citizen.InvokeNative(0x6BAB9442830C7F53, v.doorid, 0)
-							end
-						end
-						FreezeEntityPosition(doorID.object,false)
-					end
-
-				else
-					if doorID.locked then
-						if Citizen.InvokeNative(0x160AA1B32F6139B8, doorID.doorid) ~= 3 then
-							Citizen.InvokeNative(0xD99229FE93B46286, doorID.doorid,1,1,0,0,0,0)
-							Citizen.InvokeNative(0x6BAB9442830C7F53, doorID.doorid, 3)
-						end
-						local current = GetEntityRotation(doorID.object).z - doorID.objYaw
-						if doorID.objYaw and current > 0.5 or current < -0.5 then
-							SetEntityRotation(doorID.object, 0.0, 0.0, doorID.objYaw, 2, true)
-						end
-						FreezeEntityPosition(doorID.object,true)
-					else
-						if Citizen.InvokeNative(0x160AA1B32F6139B8, doorID.doorid) ~= false then
-							Citizen.InvokeNative(0xD99229FE93B46286, doorID.doorid,1,1,0,0,0,0)
-							Citizen.InvokeNative(0x6BAB9442830C7F53, doorID.doorid, 0)
-						end
-						FreezeEntityPosition(doorID.object,false)
-					end
-				end
-			end
-
-			if distance < maxDistance then
-				if distance < 1.75 then
-					if IsControlJustPressed(0,Config.KeyPress) and CoolDown < 1 then
-						CoolDown = 1000
-						local state = not doorID.locked
-						TriggerServerEvent("lxr-doorlock:updatedoorsv", k, state)
-					end
-				end
-			end
-
-			if CoolDown > 0 then
-				CoolDown = CoolDown - 1
-			end
-		end
-
-		if letSleep then
-			Wait(500)
-		end
-	end
+exports('IsLocked', locked)
+exports('Nearest', function()
+    local pos = GetEntityCoords(PlayerPedId())
+    local best, bd
+    for _, d in ipairs(Config.List) do local dist = #(pos - d.coords) if not bd or dist < bd then best, bd = d, dist end end
+    return best, bd
 end)

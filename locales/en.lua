@@ -1,36 +1,12 @@
---[[
-    ██╗     ██╗  ██╗██████╗        ██████╗ ██████╗ ██████╗ ███████╗
-    ██║     ╚██╗██╔╝██╔══██╗      ██╔════╝██╔═══██╗██╔══██╗██╔════╝
-    ██║      ╚███╔╝ ██████╔╝█████╗██║     ██║   ██║██████╔╝█████╗  
-    ██║      ██╔██╗ ██╔══██╗╚════╝██║     ██║   ██║██╔══██╗██╔══╝  
-    ███████╗██╔╝ ██╗██║  ██║      ╚██████╗╚██████╔╝██║  ██║███████╗
-    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝       ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+--[[ ═══════════════════════════════════════════════════════════════════════════
+     LXR-DOORS — Locale: English (canonical)
+     Developer   : iBoss21 | Brand : LXRCore | https://www.lxrcore.com
+     © 2026 iBoss21 / LXRCore — All Rights Reserved
+     ═══════════════════════════════════════════════════════════════════════════ ]]
 
-    🐺 LXR Door Lock System — Locale: English (en)
-
-    ═══════════════════════════════════════════════════════════════════════════════
-    Server:    The Land of Wolves 🐺 | Developer: iBoss21 / The Lux Empire
-    Website:   https://www.wolves.land | Discord: https://discord.gg/CrKcWdfd3A
-    Store:     https://theluxempire.tebex.io
-    © 2026 iBoss21 / The Lux Empire | wolves.land | All Rights Reserved
-    ═══════════════════════════════════════════════════════════════════════════════
-]]
-
-local Translations = {
-    error = {
-        nokey = "You do not have a key!",
-    },
-    success = { 
-        
-    },
-    info = {
-        unlocked = "unlocked",
-        unlocking = "Unlocking",
-        locking = "Locking",
-    }
-}
-
-Lang = Locale:new({
-    phrases = Translations,
-    warnOnMissing = true
+Locale.Register('en', {
+    ui = { unlock = 'Unlock', lock = 'Lock', pick = 'Pick the lock', knock = 'Knock', try = 'Try the door' },
+    error = { rate = 'Slow down.', invalid = 'That door is not known.', too_far = 'Step up to the door.', no_key = 'You have no key to this door.', no_pick = 'You need a lockpick.', open = 'It is already open.' },
+    info = { picked = 'The lock on %{label} gives.', locked_door = '%{label} is locked.' },
+    me = { knock = 'knocks on %{label}' },
 })

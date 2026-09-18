@@ -1,279 +1,118 @@
 --[[
-    ██╗     ██╗  ██╗██████╗        ██████╗ ██████╗ ██████╗ ███████╗
-    ██║     ╚██╗██╔╝██╔══██╗      ██╔════╝██╔═══██╗██╔══██╗██╔════╝
-    ██║      ╚███╔╝ ██████╔╝█████╗██║     ██║   ██║██████╔╝█████╗  
-    ██║      ██╔██╗ ██╔══██╗╚════╝██║     ██║   ██║██╔══██╗██╔══╝  
-    ███████╗██╔╝ ██╗██║  ██║      ╚██████╗╚██████╔╝██║  ██║███████╗
-    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝       ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+    ██╗     ██╗  ██╗██████╗       ██████╗  ██████╗  ██████╗ ██████╗ ███████╗
+    ██║     ╚██╗██╔╝██╔══██╗      ██╔══██╗██╔═══██╗██╔═══██╗██╔══██╗██╔════╝
+    ██║      ╚███╔╝ ██████╔╝█████╗██║  ██║██║   ██║██║   ██║██████╔╝███████╗
+    ██║      ██╔██╗ ██╔══██╗╚════╝██║  ██║██║   ██║██║   ██║██╔══██╗╚════██║
+    ███████╗██╔╝ ██╗██║  ██║      ██████╔╝╚██████╔╝╚██████╔╝██║  ██║███████║
+    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝      ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚══════╝
 
-    🐺 LXR Core - Door Lock System
+    LXR Core - Doors
 
-    Job-based door lock system for RedM servers. Configure which jobs can
-    access which doors, set lock states, and customize interaction distances.
-    Supports double-door groups and single doors with per-door coordinates.
+    Every lockable door in the world, who may work it, and what state it is
+    in. The server owns the state (persisted, replicated through global
+    state bags); the client only registers doors with the game and offers
+    the options through lxr-interact. Keys are items, lockpicking is a hook.
 
-    ═══════════════════════════════════════════════════════════════════════════════
-    SERVER INFORMATION
-    ═══════════════════════════════════════════════════════════════════════════════
+    Brand:       LXRCore — Lux Empire eXperience RedM Core
+    Product:     wolves.land / The Land of Wolves
+    Developer:   iBoss21 / LXRCore
+    Website:     https://www.lxrcore.com
+    Discord:     https://discord.gg/ZHMKVYyhBa (development)
+    GitHub:      https://github.com/LXRCore
 
-    Server:      The Land of Wolves 🐺
-    Developer:   iBoss21 / The Lux Empire
-    Website:     https://www.wolves.land
-    Discord:     https://discord.gg/CrKcWdfd3A
-    Store:       https://theluxempire.tebex.io
+    Version: 3.0.0
+    Performance Target: 0.00 ms idle (no loops: state bag handlers + lxr-interact points)
 
-    ═══════════════════════════════════════════════════════════════════════════════
-
-    Version: 1.3.0
-
-    Framework Support:
-    - LXR Core (Primary)
-    - RSG Core (Compatible)
-    - VORP Core (Compatible)
-    - RedEM:RP (Compatible)
-    - QBR Core (Compatible)
-    - QR Core (Compatible)
-    - Standalone (Compatible)
-
-    ═══════════════════════════════════════════════════════════════════════════════
-
-    © 2026 iBoss21 / The Lux Empire | wolves.land | All Rights Reserved
+    © 2026 iBoss21 / LXRCore | lxrcore.com | All Rights Reserved
 ]]
 
--- ═══════════════════════════════════════════════════════════════════════════════
--- 🐺 RESOURCE NAME PROTECTION - RUNTIME CHECK
--- ═══════════════════════════════════════════════════════════════════════════════
-
-local REQUIRED_RESOURCE_NAME = 'lxr-doorlock'
-local currentResourceName = GetCurrentResourceName()
-
-if currentResourceName ~= REQUIRED_RESOURCE_NAME then
-    error(string.format([[
-
-        ═══════════════════════════════════════════════════════════════════════════════
-        ❌ CRITICAL ERROR: RESOURCE NAME MISMATCH ❌
-        ═══════════════════════════════════════════════════════════════════════════════
-
-        Expected: %s
-        Got:      %s
-
-        This resource is branded and must maintain the correct name.
-        Rename the folder to "%s" to continue.
-
-        🐺 wolves.land - The Land of Wolves
-
-        ═══════════════════════════════════════════════════════════════════════════════
-
-    ]], REQUIRED_RESOURCE_NAME, currentResourceName, REQUIRED_RESOURCE_NAME))
-end
-
-Config = {}
+Config = Config or {}
 
 -- ████████████████████████████████████████████████████████████████████████████████
--- ████████████████████████ SERVER BRANDING & INFO ████████████████████████████████
+-- ████████████████████████ LANGUAGE ██████████████████████████████████████████████
 -- ████████████████████████████████████████████████████████████████████████████████
+Config.Lang = 'en'
 
-Config.ServerInfo = {
-    name      = 'The Land of Wolves 🐺',
-    developer = 'iBoss21 / The Lux Empire',
-    website   = 'https://www.wolves.land',
-    discord   = 'https://discord.gg/CrKcWdfd3A',
-    store     = 'https://theluxempire.tebex.io',
-    github    = 'https://github.com/iBoss21',
+-- ████████████████████████████████████████████████████████████████████████████████
+-- ████████████████████████ BEHAVIOUR ═════════════════════════════════════════════
+-- ████████████████████████████████████████████████████████████████████████████████
+Config.Doors = {
+    persist = true,             -- remember lock states across restarts (lxr_doors table)
+    autoLockMs = 0,             -- 0 never; >0 doors relock this long after being unlocked (per door `autoLock` overrides)
+    breakable = false,          -- locked doors can be shot / kicked open by the game (DOORSTATE_LOCKED_BREAKABLE)
+    lockedSound = 'Door_Locked', -- feedback when a locked door is tried
+    distance = 2.0,             -- default reach of the interaction point
+    knock = true,               -- offer "Knock" on locked doors the player may not open
+}
+
+-- lockpicking: the hook lxr-lockpick (or any minigame) calls back into
+Config.Pick = {
+    enabled = true,
+    items = { 'lockpick', 'lockpick_fine' },
+    relockMs = 120000,          -- a picked door relocks itself after this
+    alertLaw = true,            -- emit lxr:doors:picked for dispatch
+    event = 'lxr-lockpick:client:start', -- client event that runs the minigame; it reports back with lxr-doors:server:picked
+}
+
+-- key items from the core catalog and how each one matches a door
+Config.Keys = {
+    key_house  = function(info, door) return info and info.id == door.id end,
+    key_cell   = function(info, door) return info and door.town and info.town == door.town and door.cell end,
+    key_ring   = function(info, door) if not info or type(info.keys) ~= 'table' then return false end for _, k in ipairs(info.keys) do if k == door.id then return true end end return false end,
 }
 
 -- ████████████████████████████████████████████████████████████████████████████████
--- ████████████████████████ FRAMEWORK CONFIGURATION ███████████████████████████████
+-- ████████████████████████ THE DOORS ═════════════════════════════════════════════
 -- ████████████████████████████████████████████████████████████████████████████████
+-- id        unique; used by keys (info.id), exports and events
+-- hashes    the game's door registry hashes (one for a single door, two for a pair)
+-- coords    the interaction point (roughly the middle of the frame)
+-- locked    state on first start (persisted afterwards when Config.Doors.persist)
+-- who       { jobs = { vallaw = 0 }, jobTypes = { 'leo' }, gangs = { ... }, anyone = false }
+-- town      for cell keys; cell = true marks a cell door
+-- pickable  lockpicks work here; autoLock overrides the global relock time
+local LAW = { jobTypes = { 'leo', 'federal' } }
 
---[[
-    Framework Priority (in order):
-    1. LXR-Core  (Primary)
-    2. RSG-Core  (Primary)
-    3. VORP Core (Supported)
-    4. RedEM:RP  (Optional — if detected)
-    5. QBR-Core  (Optional — if detected)
-    6. QR-Core   (Optional — if detected)
-    7. Standalone (Fallback)
-]]
+Config.List = {
+    -- ═══ Valentine Sheriff's Office ═══
+    { id = 'val_sheriff_front', label = "Sheriff's Office", town = 'valentine', hashes = { 1988748538 }, coords = vector3(-275.02, 802.84, 119.43), locked = true, who = LAW, pickable = true, distance = 3.0 },
+    { id = 'val_sheriff_back',  label = "Sheriff's Office (back)", town = 'valentine', hashes = { 395506985 }, coords = vector3(-277.06, 811.83, 119.38), locked = true, who = LAW, pickable = true, distance = 3.0 },
+    { id = 'val_cell_1', label = 'Cell 1', town = 'valentine', cell = true, hashes = { 1508776842 }, coords = vector3(-270.77, 810.02, 118.39), locked = true, who = LAW, distance = 1.5 },
+    { id = 'val_cell_2', label = 'Cell 2', town = 'valentine', cell = true, hashes = { 535323366 },  coords = vector3(-274.89, 808.03, 119.39), locked = true, who = LAW, distance = 2.0 },
+    { id = 'val_cell_3', label = 'Cell 3', town = 'valentine', cell = true, hashes = { 295355979 },  coords = vector3(-272.23, 810.10, 119.39), locked = true, who = LAW, distance = 1.5 },
+    { id = 'val_cell_4', label = 'Cell 4', town = 'valentine', cell = true, hashes = { 193903155 },  coords = vector3(-273.30, 808.12, 119.39), locked = true, who = LAW, distance = 1.5 },
 
-Config.Framework = 'auto' -- 'auto' | 'lxr-core' | 'rsg-core' | 'vorp_core' | 'redem_roleplay' | 'qbr-core' | 'qr-core' | 'standalone'
+    -- ═══ Valentine Bank ═══
+    { id = 'val_bank_front', label = 'Bank', town = 'valentine', hashes = { 3886827663, 2642457609 }, coords = vector3(-308.11, 779.91, 118.96), locked = false, who = { jobs = { bank = 0 }, jobTypes = { 'leo' } }, distance = 2.5 },
+    { id = 'val_bank_office', label = "Manager's Office", town = 'valentine', hashes = { 2343746133 }, coords = vector3(-303.02, 771.60, 118.47), locked = true, who = { jobs = { bank = 1 }, jobTypes = { 'leo' } }, pickable = true, distance = 3.0 },
+    { id = 'val_bank_counter', label = 'Counter Gate', town = 'valentine', hashes = { 1340831050 }, coords = vector3(-310.48, 774.92, 118.70), locked = true, who = { jobs = { bank = 0 }, jobTypes = { 'leo' } }, distance = 3.0 },
+    { id = 'val_bank_vault_hall', label = 'Vault Hall', town = 'valentine', hashes = { 3718620420 }, coords = vector3(-309.97, 770.20, 118.70), locked = true, who = { jobs = { bank = 1 }, jobTypes = { 'leo' } }, pickable = true, distance = 3.0 },
+    { id = 'val_bank_side', label = 'Side Door', town = 'valentine', hashes = { 334467483 }, coords = vector3(-302.97, 768.61, 118.70), locked = true, who = { jobs = { bank = 0 }, jobTypes = { 'leo' } }, pickable = true, distance = 3.0 },
+    { id = 'val_bank_vault', label = 'Vault', town = 'valentine', hashes = { 576950805 }, coords = vector3(-306.60, 766.65, 118.70), locked = true, who = { jobs = { bank = 2 } }, distance = 3.0 },
+    { id = 'val_bank_back', label = 'Back Door', town = 'valentine', hashes = { 2307914732 }, coords = vector3(-300.59, 763.20, 118.70), locked = true, who = { jobs = { bank = 0 }, jobTypes = { 'leo' } }, pickable = true, distance = 3.0 },
 
--- ████████████████████████████████████████████████████████████████████████████████
--- ████████████████████████ GENERAL SETTINGS ██████████████████████████████████████
--- ████████████████████████████████████████████████████████████████████████████████
+    -- ═══ Rhodes Sheriff's Office ═══
+    { id = 'rho_sheriff_front', label = "Sheriff's Office", town = 'rhodes', hashes = { 349074475 },  coords = vector3(1358.42, -1305.71, 77.72), locked = false, who = LAW, pickable = true, distance = 3.0 },
+    { id = 'rho_sheriff_cells', label = 'Cells', town = 'rhodes', cell = true, hashes = { 1614494720 }, coords = vector3(1358.51, -1298.95, 77.78), locked = true, who = LAW, distance = 3.0 },
 
-Config.KeyPress = 0xCEFD9220  -- Key hash for door interaction (default: G)
+    -- ═══ Blackwater Marshal's Office ═══
+    { id = 'blk_marshal_front', label = "Marshal's Office", town = 'blackwater', hashes = { 3410720590, 3821185084 }, coords = vector3(-757.27, -1269.34, 44.04), locked = false, who = LAW, pickable = true, distance = 2.5 },
 
--- ████████████████████████████████████████████████████████████████████████████████
--- ████████████████████████ DOOR LIST ████████████████████████████████████████████
--- ████████████████████████████████████████████████████████████████████████████████
-
---[[
-    Door Entry Fields:
-    ─────────────────────────────────────────────────────────────────────────────
-    authorizedJobs  (table)    Job names that can interact with this door
-    doorid          (number)   RDR3 door hash / entity identifier
-    objCoords       (vector3)  World position of the door object
-    textCoords      (vector3)  World position of the interaction text prompt
-    objYaw          (number)   Locked heading/rotation of the door (degrees)
-    locked          (boolean)  Default lock state on resource start
-    distance        (number)   Interaction distance from textCoords (default 1.25)
-
-    For double-door groups, omit doorid/objCoords/objYaw at the top level and
-    instead supply a `doors` table containing individual door definitions.
-    ─────────────────────────────────────────────────────────────────────────────
-]]
-
-Config.DoorList = {
-    -- ──────────────────────────────────────────────────────────────────────────
-    -- Valentine Sheriff Office
-    -- ──────────────────────────────────────────────────────────────────────────
-    {
-        authorizedJobs = { 'police' }, doorid = 1988748538,
-        objCoords = vector3(-276.04, 802.73, 118.41), textCoords = vector3(-275.02, 802.84, 119.43),
-        objYaw = 10.0, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 395506985,
-        objCoords = vector3(-275.85, 812.02, 118.41), textCoords = vector3(-277.06, 811.83, 119.38),
-        objYaw = -170.0, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 1508776842,
-        objCoords = vector3(-270.77, 810.02, 118.39), textCoords = vector3(-270.77, 810.02, 118.39),
-        objYaw = -80.0, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 535323366,
-        objCoords = vector3(-275.03, 809.27, 118.36), textCoords = vector3(-274.89, 808.03, 119.39),
-        objYaw = -80.0, locked = true, distance = 2.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 295355979,
-        objCoords = vector3(-273.47, 809.96, 118.36), textCoords = vector3(-272.23, 810.1, 119.39),
-        objYaw = 10.0, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 193903155,
-        objCoords = vector3(-272.06, 808.25, 118.36), textCoords = vector3(-273.3, 808.12, 119.39),
-        objYaw = -170.0, locked = true, distance = 1.5
-    },
-
-    -- ──────────────────────────────────────────────────────────────────────────
-    -- Valentine Bank
-    -- ──────────────────────────────────────────────────────────────────────────
-    {
-        textCoords = vector3(-308.11, 779.91, 118.96),
-        authorizedJobs = { 'police' }, locked = false, distance = 2.5,
-        doors = {
-            { doorid = 3886827663, objCoords = vector3(-306.89, 780.11, 117.72), objYaw = -170.0 },
-            { doorid = 2642457609, objCoords = vector3(-309.06, 779.73, 117.72), objYaw = 10.05 }
-        }
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 2343746133,
-        objCoords = vector3(-301.94, 771.75, 117.72), textCoords = vector3(-303.02, 771.60, 118.47),
-        objYaw = -170.0, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 1340831050,
-        objCoords = vector3(-311.75, 774.67, 117.72), textCoords = vector3(-310.48, 774.92, 118.70),
-        objYaw = 10.05, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 3718620420,
-        objCoords = vector3(-311.06, 770.12, 117.7), textCoords = vector3(-309.97, 770.20, 118.70),
-        objYaw = 10.36, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 334467483,
-        objCoords = vector3(-302.93, 767.6, 117.69), textCoords = vector3(-302.97, 768.61, 118.70),
-        objYaw = 100.0, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 576950805,
-        objCoords = vector3(-307.76, 766.34, 117.7), textCoords = vector3(-306.60, 766.65, 118.70),
-        objYaw = -170.0, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 2307914732,
-        objCoords = vector3(-301.51, 762.98, 117.73), textCoords = vector3(-300.59, 763.20, 118.70),
-        objYaw = 10.0, locked = true, distance = 3.0
-    },
-
-    -- ──────────────────────────────────────────────────────────────────────────
-    -- Sisika Prison
-    -- ──────────────────────────────────────────────────────────────────────────
-    {
-        authorizedJobs = { 'police' }, doorid = 1692000954,
-        objCoords = vector3(3331.85, -700.07, 43.09), textCoords = vector3(3331.85, -700.07, 43.09),
-        objYaw = -47.99, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = -1819721708,
-        objCoords = vector3(3333.60, -702.02, 43.09), textCoords = vector3(3333.60, -702.02, 43.09),
-        objYaw = -47.99, locked = true, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 559643844,
-        objCoords = vector3(3350.70, -648.00, 44.40), textCoords = vector3(3350.70, -648.00, 44.40),
-        objYaw = 14.99, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 559643844,
-        objCoords = vector3(3349.96, -645.28, 44.41), textCoords = vector3(3349.96, -645.28, 44.41),
-        objYaw = 14.99, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 4249790129,
-        objCoords = vector3(3384.61, -639.47, 45.47), textCoords = vector3(3384.61, -639.47, 45.47),
-        objYaw = -29.77, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 559643844,
-        objCoords = vector3(3366.45, -680.12, 45.49), textCoords = vector3(3366.45, -680.12, 45.49),
-        objYaw = -85.0, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 559643844,
-        objCoords = vector3(3369.56, -723.59, 44.31), textCoords = vector3(3369.56, -723.59, 44.31),
-        objYaw = -179.43, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 559643844,
-        objCoords = vector3(3407.31, -677.72, 45.50), textCoords = vector3(3407.31, -677.72, 45.50),
-        objYaw = -99.40, locked = true, distance = 1.5
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = -1694920053,
-        objCoords = vector3(3318.45, -658.00, 44.85), textCoords = vector3(3318.45, -658.00, 44.85),
-        objYaw = 60.0, locked = true, distance = 1.5
-    },
-
-    -- ──────────────────────────────────────────────────────────────────────────
-    -- Rhodes Sheriff Office
-    -- ──────────────────────────────────────────────────────────────────────────
-    {
-        authorizedJobs = { 'police' }, doorid = 349074475,
-        objCoords = vector3(1359.71, -1305.97, 76.76), textCoords = vector3(1358.42, -1305.71, 77.72),
-        objYaw = 160.0, locked = false, distance = 3.0
-    },
-    {
-        authorizedJobs = { 'police' }, doorid = 1614494720,
-        objCoords = vector3(1359.12, -1297.56, 76.78), textCoords = vector3(1358.51, -1298.95, 77.78),
-        objYaw = -110.0, locked = true, distance = 3.0
-    },
-
-    -- ──────────────────────────────────────────────────────────────────────────
-    -- Blackwater Sheriff Office
-    -- ──────────────────────────────────────────────────────────────────────────
-    {
-        textCoords = vector3(-757.27, -1269.34, 44.04),
-        authorizedJobs = { 'police' }, locked = false, distance = 2.5,
-        doors = {
-            { objYaw = 90.0, doorid = 3410720590, objCoords = vector3(-757.05, -1268.49, 43.06) },
-            { objYaw = 90.0, doorid = 3821185084, objCoords = vector3(-757.05, -1269.93, 43.06) }
-        }
-    }
+    -- ═══ Sisika Penitentiary (gate + yard doors carrying unique registry hashes) ═══
+    { id = 'sisika_gate', label = 'Prison Gate', town = 'sisika', hashes = { 1692000954 }, coords = vector3(3331.85, -700.07, 43.09), locked = true, who = { jobs = { prison = 0 }, jobTypes = { 'leo', 'federal' } }, distance = 3.0 },
+    { id = 'sisika_block', label = 'Cell Block', town = 'sisika', cell = true, hashes = { 4249790129 }, coords = vector3(3384.61, -639.47, 45.47), locked = true, who = { jobs = { prison = 0 }, jobTypes = { 'leo', 'federal' } }, distance = 1.5 },
 }
+
+-- ████████████████████████████████████████████████████████████████████████████████
+-- ████████████████████████ SECURITY ══════════════════════════════════════════════
+-- ████████████████████████████████████████████████████████████████████████████████
+Config.Security = {
+    rateLimit = { windowMs = 2000, burst = 8 },
+    maxDistance = 4.0,          -- the server refuses toggles further than this from the door
+    adminAce = 'lxrcore.admin', -- may lock / unlock anything
+}
+
+-- ████████████████████████████████████████████████████████████████████████████████
+-- ████████████████████████ DEBUG ═════════════════════════════════════════════════
+-- ████████████████████████████████████████████████████████████████████████████████
+Config.Debug = { printBanner = true, log = false }

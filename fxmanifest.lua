@@ -1,83 +1,41 @@
 --[[
-    ██╗     ██╗  ██╗██████╗        ██████╗ ██████╗ ██████╗ ███████╗
-    ██║     ╚██╗██╔╝██╔══██╗      ██╔════╝██╔═══██╗██╔══██╗██╔════╝
-    ██║      ╚███╔╝ ██████╔╝█████╗██║     ██║   ██║██████╔╝█████╗  
-    ██║      ██╔██╗ ██╔══██╗╚════╝██║     ██║   ██║██╔══██╗██╔══╝  
-    ███████╗██╔╝ ██╗██║  ██║      ╚██████╗╚██████╔╝██║  ██║███████╗
-    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝       ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+    LXR Core - Doors
 
-    🐺 LXR Door Lock System - FiveM Resource Manifest
+    Brand:       LXRCore — Lux Empire eXperience RedM Core
+    Product:     wolves.land / The Land of Wolves
+    Developer:   iBoss21 / LXRCore
+    Website:     https://www.lxrcore.com
+    Discord:     https://discord.gg/ZHMKVYyhBa (development)
+    GitHub:      https://github.com/LXRCore
 
-    ═══════════════════════════════════════════════════════════════════════════════
-    RESOURCE INFORMATION
-    ═══════════════════════════════════════════════════════════════════════════════
+    Version: 1.0.0
+    Performance Target: 0.00 ms idle
 
-    Resource Name:  lxr-doorlock
-    Version:        1.3.0
-    Author:         iBoss21 / The Lux Empire
-    Description:    Multi-framework door lock system for RedM with job-based access
-                    control, animations, and configurable door lists.
+    Framework Support:
+    - LXR Core v3 (Native — GetCoreObject / GetLXR)
 
-    Server:         The Land of Wolves 🐺
-    Developer:      iBoss21 / The Lux Empire
-    Website:        https://www.wolves.land
-    Discord:        https://discord.gg/CrKcWdfd3A
-    Store:          https://theluxempire.tebex.io
-
-    ═══════════════════════════════════════════════════════════════════════════════
-    FRAMEWORK SUPPORT
-    ═══════════════════════════════════════════════════════════════════════════════
-
-    Primary:
-    - LXR Core (lxr-core)
-    - RSG Core (rsg-core)
-
-    Supported:
-    - VORP Core (vorp_core)
-
-    Optional (if detected):
-    - RedEM:RP (redem_roleplay)
-    - QBR Core (qbr-core)
-    - QR Core (qr-core)
-    - Standalone (no framework)
-
-    ═══════════════════════════════════════════════════════════════════════════════
-
-    © 2026 iBoss21 / The Lux Empire | wolves.land | All Rights Reserved
+    © 2026 iBoss21 / LXRCore | lxrcore.com | All Rights Reserved
 ]]
 
 fx_version 'cerulean'
-game       'rdr3'
-
+game 'rdr3'
 rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aware my resources *will* become incompatible once RedM ships.'
-
--- Resource Metadata
-name        'LXR Door Lock System'
-author      'iBoss21 / The Lux Empire'
-description 'Multi-framework door lock system with job-based access control and animations'
-version     '1.3.0'
-
--- Lua 5.4
 lua54 'yes'
 
--- Shared Scripts (loaded on both client and server)
+name 'lxr-doors'
+author 'iBoss21 / LXRCore'
+description 'LXRCore v3 doors: server-owned lock states, job / gang / key access, lockpick hook, relock timers, replicated through global state'
+version '3.0.0'
+repository 'https://github.com/LXRCore/lxr-doors'
+
 shared_scripts {
-    '@lxr--core/shared/locale.lua',
-    'locales/en.lua',
-    'config.lua'
+    'shared/locale.lua',
+    'locales/*.lua',
+    'config.lua',
+    'shared/rules.lua',
 }
 
--- Client Scripts
-client_scripts {
-    'client/main.lua'
-}
+client_script 'client/main.lua'
+server_script 'server/main.lua'
 
--- Server Scripts
-server_scripts {
-    'server/main.lua'
-}
-
--- Soft dependencies — framework detection handled at runtime
-dependencies {
-    '/onesync'
-}
+dependencies { 'lxr-core', 'lxr-interact' }
