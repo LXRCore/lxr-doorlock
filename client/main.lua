@@ -44,11 +44,14 @@ local function register(door)
     apply(door)
     AddStateBagChangeHandler('door:' .. door.id, 'global', function() apply(door) end)
     local I = exports['lxr-interact']
+    local function work(lock)
+        keyHand()
+        local ok, res = LXR.RPC.Server('lxr-doors:toggle', door.id, lock)
+        if not ok then toast('error.' .. tostring(res), 'error') end
+    end
     I:AddPoint('lxr-doors:' .. door.id, door.coords, { label = door.label, distance = door.distance or Config.Doors.distance, options = {
-        { label = Lang:t('ui.unlock'), key = 'J', canInteract = function() return locked(door.id) and D.MayWork(door, ctx(), me().items) end,
-          onSelect = function() local ok, res = LXR.RPC.Server('lxr-doors:toggle', door.id, false) if not ok then toast('error.' .. tostring(res), 'error') end end },
-        { label = Lang:t('ui.lock'), key = 'J', canInteract = function() return not locked(door.id) and D.MayWork(door, ctx(), me().items) end,
-          onSelect = function() local ok, res = LXR.RPC.Server('lxr-doors:toggle', door.id, true) if not ok then toast('error.' .. tostring(res), 'error') end end },
+        { label = Lang:t('ui.unlock'), key = 'J', canInteract = function() return locked(door.id) and D.MayWork(door, ctx(), me().items) end, onSelect = function() work(false) end },
+        { label = Lang:t('ui.lock'), key = 'J', canInteract = function() return not locked(door.id) and D.MayWork(door, ctx(), me().items) end, onSelect = function() work(true) end },
         { label = Lang:t('ui.pick'), key = 'G',
           canInteract = function() return Config.Pick.enabled and door.pickable and locked(door.id) and D.PickIn(me().items) ~= nil and not D.MayWork(door, ctx(), me().items) and GetResourceState('lxr-lockpick') == 'started' end,
           onSelect = function()
@@ -68,6 +71,36 @@ local function boot()
         print('^1[lxr-doors]^7 lxr-interact is not running — doors have no interaction')
     end
     for _, door in ipairs(Config.List) do register(door) end
+end
+
+-- the key in the hand before the bolt moves
+local turning = false
+function keyHand()
+    local A = Config.KeyAnim
+    if not A or not A.on or turning then return end
+    turning = true
+    local ped = PlayerPedId()
+    RequestAnimDict(A.dict)
+    local t = GetGameTimer() + 1500
+    while not HasAnimDictLoaded(A.dict) and GetGameTimer() < t do Wait(10) end
+    local prop
+    if A.prop then
+        local hash = joaat(A.prop)
+        RequestModel(hash)
+        local t2 = GetGameTimer() + 1500
+        while not HasModelLoaded(hash) and GetGameTimer() < t2 do Wait(10) end
+        if HasModelLoaded(hash) then
+            local c = GetEntityCoords(ped)
+            prop = CreateObject(hash, c.x, c.y, c.z, true, true, false)
+            AttachEntityToEntity(prop, ped, GetEntityBoneIndexByName(ped, 'SKEL_R_Finger00'), 0.02, 0.012, -0.0085, 0.024, -160.0, 200.0, true, true, false, true, 1, true)
+            SetModelAsNoLongerNeeded(hash)
+        end
+    end
+    if HasAnimDictLoaded(A.dict) then TaskPlayAnim(ped, A.dict, A.clip, 8.0, -8.0, A.ms or 1800, 31, 0.0, false, false, false) end
+    Wait(A.ms or 1800)
+    if prop then DeleteEntity(prop) end
+    if HasAnimDictLoaded(A.dict) then RemoveAnimDict(A.dict) end
+    turning = false
 end
 
 RegisterNetEvent('lxr-doors:client:added', function(def)

@@ -55,6 +55,9 @@ Config.Pick = {
 }
 
 -- key items from the core catalog and how each one matches a door
+-- the hand at the lock: the game's key animation with a key in the hand before the bolt moves (names verified)
+Config.KeyAnim = { on = true, dict = 'script_common@jail_cell@unlock@key', clip = 'action', prop = 'p_key01x', ms = 1800 }
+
 Config.Keys = {
     key_house  = function(info, door) return info and info.id == door.id end,
     key_cell   = function(info, door) return info and door.town and info.town == door.town and door.cell end,
